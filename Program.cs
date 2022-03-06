@@ -28,6 +28,9 @@
         grid.TryFill();
 
         grid.PrintUpdate(1, 1);
+
+        grid.TryMove(Direction.Right);
+
         Console.ReadLine();
 
         Console.OutputEncoding = System.Text.Encoding.Default;
@@ -52,6 +55,8 @@
         Console.ResetColor();
     }
 }
+
+public enum Direction {Up, Right, Down, Bottom};
 
 public class Grid
 {
@@ -111,6 +116,31 @@ public class Grid
 
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    public bool TryMove(Direction direction)
+    {
+        switch(direction)
+        {
+            case Direction.Right:
+            {
+                for (int y = 0; y < Size; y++)
+                {
+                    for (int i = Size - 1; i > 0; i--)
+                    {
+                        for (int x = i - 1; x >= 0; x--)
+                        {
+                            Console.Write(x);
+                        } 
+                        Console.WriteLine();
+                    }
+                }
+                
+                break;
             }
         }
 
