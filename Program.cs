@@ -23,13 +23,19 @@
 
         grid.PrintInit(1, 1);
 
+/*         grid.TryFill();
         grid.TryFill();
-        grid.TryFill();
-        grid.TryFill();
+        grid.TryFill(); */
+
+        grid.Bla(0, 16, 8, 4, 2);
 
         grid.PrintUpdate(1, 1);
 
+        Console.ReadLine();
+
         grid.TryMove(Direction.Right);
+
+        grid.PrintUpdate(1, 1);
 
         Console.ReadLine();
 
@@ -65,6 +71,7 @@ public class Grid
     public const int Size = 4;
     private readonly int[,] _grid;
     private readonly Random _rnd;
+    private readonly List<int> _list;
 
     public Grid()
     {
@@ -79,6 +86,7 @@ public class Grid
         }
 
         _rnd = new();
+        _list = new();
     }
 
     private int GetEmptyCells()
@@ -97,6 +105,14 @@ public class Grid
         }
 
         return emptyCells;
+    }
+
+    public void Bla(int y, int v0, int v1, int v2, int v3)
+    {
+        _grid[y, 0] = v0;
+        _grid[y, 1] = v1;
+        _grid[y, 2] = v2;
+        _grid[y, 3] = v3;
     }
 
     public bool TryFill()
@@ -122,29 +138,78 @@ public class Grid
         return false;
     }
 
-    public bool TryMove(Direction direction)
+    private void OrderCells(Direction direction)
     {
+        _list.Clear();
+
         switch(direction)
         {
             case Direction.Right:
             {
                 for (int y = 0; y < Size; y++)
                 {
-                    for (int i = Size - 1; i > 0; i--)
+                    for (int x = 0; x < Size; x++)
                     {
-                        for (int x = i - 1; x >= 0; x--)
+                        int value = _grid[y, x];
+
+                        if (value != 0)
                         {
-                            Console.Write(x);
-                        } 
-                        Console.WriteLine();
+                            _list.Add(value);
+                        }
+                        else
+                        {
+                            _list.Insert(0, 0);
+                        }
+                    }
+
+                    for (int x = 0; x < Size; x++)
+                    {
+                        _grid[y, x] = _list[x];
                     }
                 }
-                
+
                 break;
             }
         }
+    }
 
-        return false;
+    private void OrderStep2(Direction direction)
+    {
+        _list.Clear();
+
+        switch(direction)
+        {
+            case Direction.Right:
+            {
+                for (int y = 0; y < Size; y++)
+                {
+                    for (int x = Size - 1; x > 0; x--)
+                    {
+                        int value1 = _grid[y, x];
+                        int value2 = _grid[y, x - 1];
+
+                        if (value1 == value2)
+                        {
+                            _grid[y, x] = value1 + value2;
+                            _grid[y, x - 1] = 0;
+
+                            x--;
+                        }
+                    }
+                }
+
+                break;
+            }
+        }
+    }
+
+    public bool TryMove(Direction direction)
+    {
+        OrderCells(direction); //Primo Step
+        OrderStep2(direction); //Secondo Step
+        OrderCells(direction); //Terzo Step
+
+        return true; //!Old PlayField
     }
 
     public void PrintInit(int left, int top)
