@@ -51,9 +51,9 @@ public class Program
 
                 switch (cKI.Key)
                 {
-                    //case ConsoleKey.UpArrow: // TODO: .
-                    //case ConsoleKey.DownArrow:
-                    //case ConsoleKey.LeftArrow:
+                    case ConsoleKey.UpArrow:
+                    case ConsoleKey.DownArrow:
+                    case ConsoleKey.LeftArrow:
                     case ConsoleKey.RightArrow:
                     {
                         if (grid.TryMove(GetDirectionByConsoleKey(cKI.Key), out int score))
@@ -270,21 +270,87 @@ public class Grid
         {
             case Direction.Up:
             {
-                // TODO: .
+                for (int x = 0; x < Size; x++)
+                {
+                    _lst.Clear();
+
+                    for (int y = Size - 1; y >= 0; y--)
+                    {
+                        int value = _grid[y, x];
+
+                        if (value != 0)
+                        {
+                            _lst.Insert(0, value);
+                        }
+                        else
+                        {
+                            _lst.Add(0);
+                        }
+                    }
+
+                    for (int y = 0; y < Size; y++)
+                    {
+                        _grid[y, x] = _lst[y];
+                    }
+                }
 
                 break;
             }
 
             case Direction.Down:
             {
-                // TODO: .
+                for (int x = 0; x < Size; x++)
+                {
+                    _lst.Clear();
+
+                    for (int y = 0; y < Size; y++)
+                    {
+                        int value = _grid[y, x];
+
+                        if (value != 0)
+                        {
+                            _lst.Add(value);
+                        }
+                        else
+                        {
+                            _lst.Insert(0, 0);
+                        }
+                    }
+
+                    for (int y = 0; y < Size; y++)
+                    {
+                        _grid[y, x] = _lst[y];
+                    }
+                }
 
                 break;
             }
 
             case Direction.Left:
             {
-                // TODO: .
+                for (int y = 0; y < Size; y++)
+                {
+                    _lst.Clear();
+
+                    for (int x = Size - 1; x >= 0; x--)
+                    {
+                        int value = _grid[y, x];
+
+                        if (value != 0)
+                        {
+                            _lst.Insert(0, value);
+                        }
+                        else
+                        {
+                            _lst.Add(0);
+                        }
+                    }
+
+                    for (int x = 0; x < Size; x++)
+                    {
+                        _grid[y, x] = _lst[x];
+                    }
+                }
 
                 break;
             }
@@ -328,21 +394,78 @@ public class Grid
         {
             case Direction.Up:
             {
-                // TODO: .
+                for (int x = 0; x < Size; x++)
+                {
+                    _lst.Clear();
+
+                    for (int y = 0; y <= Size - 2; y++)
+                    {
+                        int up  = _grid[y, x];
+                        int down = _grid[y + 1, x];
+
+                        if (up == down)
+                        {
+                            _grid[y, x] = up + down;
+                            _grid[y + 1, x] = 0;
+
+                            y++;
+
+                            score += up + down;
+                        }
+                    }
+                }
 
                 break;
             }
 
             case Direction.Down:
             {
-                // TODO: .
+                for (int x = 0; x < Size; x++)
+                {
+                    _lst.Clear();
+
+                    for (int y = Size - 2; y >= 0; y--)
+                    {
+                        int up  = _grid[y, x];
+                        int down = _grid[y + 1, x];
+
+                        if (up == down)
+                        {
+                            _grid[y, x] = 0;
+                            _grid[y + 1, x] = up + down;
+
+                            y--;
+
+                            score += up + down;
+                        }
+                    }
+                }
 
                 break;
             }
 
             case Direction.Left:
             {
-                // TODO: .
+                for (int y = 0; y < Size; y++)
+                {
+                    _lst.Clear();
+
+                    for (int x = 0; x <= Size - 2; x++)
+                    {
+                        int left  = _grid[y, x];
+                        int right = _grid[y, x + 1];
+
+                        if (left == right)
+                        {
+                            _grid[y, x] = left + right;
+                            _grid[y, x + 1] = 0;
+
+                            x++;
+
+                            score += left + right;
+                        }
+                    }
+                }
 
                 break;
             }
@@ -421,7 +544,7 @@ public class Grid
             for (int x = 0; x < Size; x++)
             {
                 int value = _grid[y, x];
-                string strValue = value != 0 ? $"{value}" : "   ";
+                string strValue = value != 0 ? $"{value}".PadRight(4) : "    ";
 
                 Program.Write(strValue, left + (x * 7) + 2, top + (y * 4) + 2);
             }
