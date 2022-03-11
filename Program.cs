@@ -262,13 +262,15 @@ public class Grid
         return true;
     }
 
-    public bool TryMove(Direction direction, out bool isMerge) // TODO: Try.
+    public bool TryMove(Direction direction, out bool isMerge)
     {
+        int[,] grid = GetGridClone(_grid);
+
         SeparationStep(direction);
         MergingStep(direction, out isMerge);
         SeparationStep(direction);
 
-        return true;
+        return !AreGridsEqual(_grid, grid);
     }
 
     public bool ThereAreEmptyCells()
@@ -576,6 +578,30 @@ public class Grid
                 break;
             }
         }
+    }
+
+    private static int[,] GetGridClone(int[,] gridSrc)
+    {
+        return (int[,])gridSrc.Clone();
+    }
+
+    private static bool AreGridsEqual(int[,] gridSrc, int[,] gridDst)
+    {
+        Trace.Assert(gridSrc.GetLength(0) == Size && gridSrc.GetLength(1) == Size);
+        Trace.Assert(gridDst.GetLength(0) == Size && gridDst.GetLength(1) == Size);
+
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                if (gridSrc[y, x] != gridDst[y, x])
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     public void Print(bool init = false)
