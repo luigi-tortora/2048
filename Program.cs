@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 
 public class Program
@@ -8,6 +9,8 @@ public class Program
     {
         const int Max = 2048;
 
+        Console.Title = $"{Max}";
+
         Console.OutputEncoding = System.Text.Encoding.Unicode;
         Console.CursorVisible = false;
 
@@ -15,8 +18,8 @@ public class Program
 
         Console.SetWindowPosition(0, 0);
 
-        Console.WindowWidth = 1 + Grid.GridWidth + 1;
-        Console.WindowHeight = 1 + Grid.GridHeight + 1;
+        Console.WindowWidth = 33;
+        Console.WindowHeight = 27;
 
         Console.BufferWidth = Console.WindowWidth;
         Console.BufferHeight = Console.WindowHeight;
@@ -25,22 +28,15 @@ public class Program
 
         Grid grid = new();
 
-        grid.PrintInit(1, 1);
-
-        //grid.Dbg(0, 4, 4, 2, 2); // TODO: .
-
         grid.TryFill();
         grid.TryFill();
 
-        grid.PrintUpdate(1, 1);
-
-        int totalScore = 0;
-        int max = grid.GetMax();
-
-        Console.Title = $"- {Max} - [Score: {totalScore}] [Max: {max}]";
+        grid.Print(init: true);
 
         bool exit = false;
         GameOver gameOver = GameOver.None;
+
+        PrintStats(grid, gameOver, init: true);
 
         while (!exit && gameOver != GameOver.YouLose)
         {
@@ -56,42 +52,38 @@ public class Program
                     case ConsoleKey.LeftArrow:
                     case ConsoleKey.RightArrow:
                     {
-                        if (grid.TryMove(GetDirectionByConsoleKey(cKI.Key), out int score))
+                        if (grid.TryMove(GetDirectionByConsoleKey(cKI.Key), out bool isMerge))
                         {
-                            grid.TryFill();
+                            Trace.Assert(grid.TryFill());
 
-                            grid.PrintUpdate(1, 1);
+                            grid.Print();
 
-                            totalScore += score;
-                            max = grid.GetMax();
+                            PrintStats(grid, gameOver);
 
-                            if (max != Max) // max < Max || max > Max
-                            {
-                                Console.Title = $"- {Max} - [Score: {totalScore}] [Max: {max}]";
-
-                                Program.BeepAsync(frequencyA: score == 0 ? 800 : 1000, duration: 250);
-                            }
-                            else // max == Max
-                            {
-                                gameOver = GameOver.YouWin;
-
-                                Console.Title = $"- {Max} - [Score: {totalScore}] [You Win!]";
-
-                                BeepAsync(frequencyA: 1000, frequencyB: 1500, duration: 500, ramp: true);
-                            }
+                            Program.BeepAsync(frequencyA: !isMerge ? 800 : 1000, duration: 250);
                         }
                         else
                         {
-                            if (false) // TODO: Simulate TryMove() for the other directions; if they all return false:
-                            {
-                                gameOver = GameOver.YouLose;
+                            Program.BeepAsync(frequencyA: 600, duration: 250);
+                        }
 
-                                Console.Title = $"- {Max} - [Score: {totalScore}] [Max: {max}] [Game Over: You Lose!]";
+                        if (grid.Max == Max)
+                        {
+                            gameOver = GameOver.YouWin;
 
-                                BeepAsync(frequencyA: 1000, frequencyB: 500, duration: 500, ramp: true);
+                            PrintStats(grid, gameOver);
 
-                                while (Console.ReadKey(true).Key != ConsoleKey.Escape);
-                            }
+                            BeepAsync(frequencyA: 1000, frequencyB: 1500, duration: 500, ramp: true);
+                        }
+                        else if (!grid.ThereAreEmptyCells() && !grid.ThereAreEqualAdjacentCells())
+                        {
+                            gameOver = GameOver.YouLose;
+
+                            PrintStats(grid, gameOver);
+
+                            BeepAsync(frequencyA: 1000, frequencyB: 500, duration: 500, ramp: true);
+
+                            while (Console.ReadKey(true).Key != ConsoleKey.Escape);
                         }
 
                         break;
@@ -128,12 +120,13 @@ public class Program
         };
     }
 
-    public static void Write(string str, int left, int top,
-        ConsoleColor foregroundColor = ConsoleColor.Gray,
-        ConsoleColor backgroundColor = ConsoleColor.Black)
+    public static void Write(
+        string str, int left, int top,
+        ConsoleColor fColor = ConsoleColor.Gray,
+        ConsoleColor bColor = ConsoleColor.Black)
     {
-        Console.ForegroundColor = foregroundColor;
-        Console.BackgroundColor = backgroundColor;
+        Console.ForegroundColor = fColor;
+        Console.BackgroundColor = bColor;
 
         Console.SetCursorPosition(left, top);
         Console.Write(str);
@@ -176,6 +169,38 @@ public class Program
             }
         });
     }
+
+    public static void PrintStats(Grid grid, GameOver gameOver, bool init = false) // TODO: May include the best score (to be persisted on disk).
+    {
+        const int width = 17;
+        const int height = 7;
+
+        int left = (Console.WindowWidth - width) / 2; // Center.
+        int top = 1; // Up.
+
+        if (init)
+        {
+            Program.Write("┌───────────────┐", left, top + 0,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("│ Score │       │", left, top + 1,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("│ Max   │       │", left, top + 2,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("╞═══════════════╡", left, top + 3,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("│ Arrows │ Move │", left, top + 4,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("│ Esc    │ Exit │", left, top + 5,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("└───────────────┘", left, top + 6,  ConsoleColor.Black, ConsoleColor.White);
+        }
+
+        Program.Write($"{grid.Score}".PadRight(5), left + 10, top + 1, ConsoleColor.Black, ConsoleColor.White);
+        Program.Write($"{grid.Max}".PadRight(5),   left + 10, top + 2, ConsoleColor.Black, ConsoleColor.White);
+
+        if (gameOver != GameOver.None)
+        {
+            string str1 = "Game Over".PadRight(13);
+            string str2 = gameOver == GameOver.YouWin ? "You Win!".PadRight(13) : "You Lose!".PadRight(13);
+
+            Program.Write(str1, left + 2, top + 4, ConsoleColor.Black, ConsoleColor.White);
+            Program.Write(str2, left + 2, top + 5, ConsoleColor.Black, ConsoleColor.White);
+        }
+    }
 }
 
 public enum Direction { Up, Down, Left, Right };
@@ -184,9 +209,10 @@ public enum GameOver { None, YouWin, YouLose }
 
 public class Grid
 {
-    public const int GridWidth = 29;
-    public const int GridHeight = 17;
     public const int Size = 4;
+
+    public int Score { get; private set; }
+    public int Max { get; private set; }
 
     private readonly int[,] _grid;
 
@@ -209,38 +235,50 @@ public class Grid
         _lst = new();
     }
 
-    public void Dbg(int y, int a, int b, int c, int d) // TODO: .
+    public bool TryFill() // TODO: Highlight cells added since last TryFill().
     {
-        _grid[y, 0] = a;
-        _grid[y, 1] = b;
-        _grid[y, 2] = c;
-        _grid[y, 3] = d;
+        if (!ThereAreEmptyCells())
+        {
+            return false;
+        }
+
+        while (true)
+        {
+            int y = _rnd.Next(0, Size);
+            int x = _rnd.Next(0, Size);
+
+            if (_grid[y, x] == 0)
+            {
+                int value = _rnd.Next(0, Size) < (Size * 3) / 4 ? 2 : 4; // 3/4 -> 2, 1/4 -> 4.
+
+                _grid[y, x] = value;
+
+                Max = Math.Max(Max, value);
+
+                break;
+            }
+        }
+
+        return true;
     }
 
-    public bool TryMove(Direction direction, out int score, bool simulate = false) // TODO: Try & simulate.
+    public bool TryMove(Direction direction, out bool isMerge) // TODO: Try.
     {
         SeparationStep(direction);
-        MergingStep(direction, out score);
+        MergingStep(direction, out isMerge);
         SeparationStep(direction);
 
         return true;
     }
 
-    public bool TryFill()
+    public bool ThereAreEmptyCells()
     {
-        if (GetEmptyCells() >= 1)
+        for (int y = 0; y < Size; y++)
         {
-            while (true)
+            for (int x = 0; x < Size; x++)
             {
-                int y = _rnd.Next(0, Size);
-                int x = _rnd.Next(0, Size);
-
                 if (_grid[y, x] == 0)
                 {
-                    int value = _rnd.Next(0, Size);
-
-                    _grid[y, x] = value <= 2 ? 2 : 4;
-
                     return true;
                 }
             }
@@ -249,19 +287,37 @@ public class Grid
         return false;
     }
 
-    public int GetMax()
+    public bool ThereAreEqualAdjacentCells()
     {
-        int max = 0;
-
         for (int y = 0; y < Size; y++)
         {
-            for (int x = 0; x < Size; x++)
+            for (int x = 0; x < Size - 1; x++)
             {
-                max = Math.Max(max, _grid[y, x]);
+                int left  = _grid[y, x];
+                int right = _grid[y, x + 1];
+
+                if (left == right && left != 0)
+                {
+                    return true;
+                }
             }
         }
 
-        return max;
+        for (int x = 0; x < Size; x++)
+        {
+            for (int y = 0; y < Size - 1; y++)
+            {
+                int up   = _grid[y, x];
+                int down = _grid[y + 1, x];
+
+                if (up == down && up != 0)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private void SeparationStep(Direction direction) // of non-zero values, preserving their order, from the others.
@@ -303,7 +359,7 @@ public class Grid
                 {
                     _lst.Clear();
 
-                    for (int y = 0; y < Size; y++)
+                    for (int y = 0; y <= Size - 1; y++)
                     {
                         int value = _grid[y, x];
 
@@ -361,7 +417,7 @@ public class Grid
                 {
                     _lst.Clear();
 
-                    for (int x = 0; x < Size; x++)
+                    for (int x = 0; x <= Size - 1; x++)
                     {
                         int value = _grid[y, x];
 
@@ -386,9 +442,9 @@ public class Grid
         }
     }
 
-    private void MergingStep(Direction direction, out int score) // of adjacent pairs of equal values.
+    private void MergingStep(Direction direction, out bool isMerge) // of adjacent pairs of equal values.
     {
-        score = 0;
+        isMerge = false;
 
         switch(direction)
         {
@@ -400,17 +456,23 @@ public class Grid
 
                     for (int y = 0; y <= Size - 2; y++)
                     {
-                        int up  = _grid[y, x];
+                        int up   = _grid[y, x];
                         int down = _grid[y + 1, x];
 
                         if (up == down)
                         {
-                            _grid[y, x] = up + down;
-                            _grid[y + 1, x] = 0;
+                            if (up != 0)
+                            {
+                                _grid[y, x] = up + down;
+                                _grid[y + 1, x] = 0;
+
+                                isMerge = true;
+
+                                Score += up + down;
+                                Max = Math.Max(Max, up + down);
+                            }
 
                             y++;
-
-                            score += up + down;
                         }
                     }
                 }
@@ -426,17 +488,23 @@ public class Grid
 
                     for (int y = Size - 2; y >= 0; y--)
                     {
-                        int up  = _grid[y, x];
+                        int up   = _grid[y, x];
                         int down = _grid[y + 1, x];
 
                         if (up == down)
                         {
-                            _grid[y, x] = 0;
-                            _grid[y + 1, x] = up + down;
+                            if (up != 0)
+                            {
+                                _grid[y, x] = 0;
+                                _grid[y + 1, x] = up + down;
+
+                                isMerge = true;
+
+                                Score += up + down;
+                                Max = Math.Max(Max, up + down);
+                            }
 
                             y--;
-
-                            score += up + down;
                         }
                     }
                 }
@@ -457,12 +525,18 @@ public class Grid
 
                         if (left == right)
                         {
-                            _grid[y, x] = left + right;
-                            _grid[y, x + 1] = 0;
+                            if (left != 0)
+                            {
+                                _grid[y, x] = left + right;
+                                _grid[y, x + 1] = 0;
+
+                                isMerge = true;
+
+                                Score += left + right;
+                                Max = Math.Max(Max, left + right);
+                            }
 
                             x++;
-
-                            score += left + right;
                         }
                     }
                 }
@@ -483,12 +557,18 @@ public class Grid
 
                         if (left == right)
                         {
-                            _grid[y, x] = 0;
-                            _grid[y, x + 1] = left + right;
+                            if (left != 0)
+                            {
+                                _grid[y, x] = 0;
+                                _grid[y, x + 1] = left + right;
+
+                                isMerge = true;
+
+                                Score += left + right;
+                                Max = Math.Max(Max, left + right);
+                            }
 
                             x--;
-
-                            score += left + right;
                         }
                     }
                 }
@@ -498,55 +578,75 @@ public class Grid
         }
     }
 
-    private int GetEmptyCells()
+    public void Print(bool init = false)
     {
-        int emptyCells = 0;
+        const int width = 29;
+        const int height = 17;
 
-        for (int y = 0; y < Size; y++)
+        int left = (Console.WindowWidth - width) / 2; // Center.
+        int top = Console.WindowHeight - height - 1; // Down.
+
+        if (init)
         {
-            for (int x = 0; x < Size; x++)
-            {
-                if (_grid[y, x] == 0)
-                {
-                    emptyCells++;
-                }
-            }
+            Program.Write("╔══════╤══════╤══════╤══════╗", left, top + 0,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 1,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 2,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 3,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("╟──────┼──────┼──────┼──────╢", left, top + 4,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 5,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 6,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 7,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("╟──────┼──────┼──────┼──────╢", left, top + 8,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 9,  ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 10, ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 11, ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("╟──────┼──────┼──────┼──────╢", left, top + 12, ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 13, ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 14, ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("║      │      │      │      ║", left, top + 15, ConsoleColor.Black, ConsoleColor.White);
+            Program.Write("╚══════╧══════╧══════╧══════╝", left, top + 16, ConsoleColor.Black, ConsoleColor.White);
         }
 
-        return emptyCells;
-    }
-
-    public void PrintInit(int left, int top)
-    {
-        Program.Write("╔══════╤══════╤══════╤══════╗", left, top + 0);
-        Program.Write("║      │      │      │      ║", left, top + 1);
-        Program.Write("║      │      │      │      ║", left, top + 2);
-        Program.Write("║      │      │      │      ║", left, top + 3);
-        Program.Write("╟──────┼──────┼──────┼──────╢", left, top + 4);
-        Program.Write("║      │      │      │      ║", left, top + 5);
-        Program.Write("║      │      │      │      ║", left, top + 6);
-        Program.Write("║      │      │      │      ║", left, top + 7);
-        Program.Write("╟──────┼──────┼──────┼──────╢", left, top + 8);
-        Program.Write("║      │      │      │      ║", left, top + 9);
-        Program.Write("║      │      │      │      ║", left, top + 10);
-        Program.Write("║      │      │      │      ║", left, top + 11);
-        Program.Write("╟──────┼──────┼──────┼──────╢", left, top + 12);
-        Program.Write("║      │      │      │      ║", left, top + 13);
-        Program.Write("║      │      │      │      ║", left, top + 14);
-        Program.Write("║      │      │      │      ║", left, top + 15);
-        Program.Write("╚══════╧══════╧══════╧══════╝", left, top + 16);
-    }
-
-    public void PrintUpdate(int left, int top) // TODO: Centered values & Colors.
-    {
         for (int y = 0; y < Size; y++)
         {
             for (int x = 0; x < Size; x++)
             {
                 int value = _grid[y, x];
-                string strValue = value != 0 ? $"{value}".PadRight(4) : "    ";
 
-                Program.Write(strValue, left + (x * 7) + 2, top + (y * 4) + 2);
+                string strValue = value switch
+                {
+                    0                 => new string(' ', 4),
+                    >= 2   and <= 8   => $" {value}  ",
+                    >= 16  and <= 64  => $" {value} ",
+                    >= 128 and <= 512 => $"{value} ",
+                    _                 => $"{value}"
+                };
+                Trace.Assert(strValue.Length <= 4);
+
+                ConsoleColor fColor = value switch
+                {
+                    0                  => ConsoleColor.Black,
+                    2 or 4             => ConsoleColor.Black,
+                    >= 8   and <= 64   => ConsoleColor.White,
+                    >= 128 and <= 2048 => ConsoleColor.Gray,
+                    _                  => ConsoleColor.White
+                };
+
+                ConsoleColor bColor = value switch
+                {
+                    0                   => ConsoleColor.White,
+                    2                   => ConsoleColor.Gray,
+                    4                   => ConsoleColor.DarkGray,
+                    8  or 16            => ConsoleColor.Red,
+                    32 or 64            => ConsoleColor.DarkRed,
+                    >= 128  and <= 512  => ConsoleColor.Yellow,
+                    >= 1024 and <= 2048 => ConsoleColor.DarkYellow,
+                    _                   => ConsoleColor.Black
+                };
+
+                Program.Write(new string(' ', 4), left + (x * 7) + 2, top + (y * 4) + 1, fColor, bColor);
+                Program.Write(strValue,           left + (x * 7) + 2, top + (y * 4) + 2, fColor, bColor);
+                Program.Write(new string(' ', 4), left + (x * 7) + 2, top + (y * 4) + 3, fColor, bColor);
             }
         }
     }
