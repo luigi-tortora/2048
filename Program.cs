@@ -7,6 +7,9 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        const int width = 33;
+        const int height = 27;
+
         const int Max = 2048;
 
         Console.Title = $"{Max}";
@@ -18,8 +21,8 @@ public class Program
 
         Console.SetWindowPosition(0, 0);
 
-        Console.WindowWidth = 33;
-        Console.WindowHeight = 27;
+        Console.WindowWidth = width;
+        Console.WindowHeight = height;
 
         Console.BufferWidth = Console.WindowWidth;
         Console.BufferHeight = Console.WindowHeight;
@@ -75,7 +78,8 @@ public class Program
 
                             BeepAsync(frequencyA: 1000, frequencyB: 1500, duration: 500, ramp: true);
                         }
-                        else if (!grid.ThereAreEmptyCells() && !grid.ThereAreEqualAdjacentCells())
+
+                        if (!grid.ThereAreEmptyCells() && !grid.ThereAreEqualAdjacentCells())
                         {
                             gameOver = GameOver.YouLose;
 
@@ -170,7 +174,7 @@ public class Program
         });
     }
 
-    public static void PrintStats(Grid grid, GameOver gameOver, bool init = false) // TODO: May include the best score (to be persisted on disk).
+    public static void PrintStats(Grid grid, GameOver gameOver, bool init = false) // TODO: May include the Hi-Score (to be persisted on disk).
     {
         const int width = 17;
         const int height = 7;
@@ -189,16 +193,16 @@ public class Program
             Program.Write("└───────────────┘", left, top + 6,  ConsoleColor.Black, ConsoleColor.White);
         }
 
-        Program.Write($"{grid.Score}".PadRight(5), left + 10, top + 1, ConsoleColor.Black, ConsoleColor.White);
-        Program.Write($"{grid.Max}".PadRight(5),   left + 10, top + 2, ConsoleColor.Black, ConsoleColor.White);
+        Program.Write($"{grid.Score}".PadRight(5), left + 10, top + 1, ConsoleColor.White, ConsoleColor.Black);
+        Program.Write($"{grid.Max}".PadRight(5),   left + 10, top + 2, ConsoleColor.White, ConsoleColor.Black);
 
         if (gameOver != GameOver.None)
         {
             string str1 = "Game Over".PadRight(13);
             string str2 = gameOver == GameOver.YouWin ? "You Win!".PadRight(13) : "You Lose!".PadRight(13);
 
-            Program.Write(str1, left + 2, top + 4, ConsoleColor.Black, ConsoleColor.White);
-            Program.Write(str2, left + 2, top + 5, ConsoleColor.Black, ConsoleColor.White);
+            Program.Write(str1, left + 2, top + 4, ConsoleColor.White, ConsoleColor.Black);
+            Program.Write(str2, left + 2, top + 5, ConsoleColor.White, ConsoleColor.Black);
         }
     }
 }
@@ -235,7 +239,7 @@ public class Grid
         _lst = new();
     }
 
-    public bool TryFill() // TODO: Highlight cells added since last TryFill().
+    public bool TryFill()
     {
         if (!ThereAreEmptyCells())
         {
@@ -251,7 +255,7 @@ public class Grid
             {
                 int value = _rnd.Next(0, Size) < (Size * 3) / 4 ? 2 : 4; // 3/4 -> 2, 1/4 -> 4.
 
-                _grid[y, x] = value;
+                _grid[y, x] = -value;
 
                 Max = Math.Max(Max, value);
 
@@ -264,13 +268,11 @@ public class Grid
 
     public bool TryMove(Direction direction, out bool isMerge)
     {
-        int[,] grid = GetGridClone(_grid);
-
-        SeparationStep(direction);
+        SeparationStep(direction, out bool isSeparation1);
         MergingStep(direction, out isMerge);
-        SeparationStep(direction);
+        SeparationStep(direction, out bool isSeparation2);
 
-        return !AreGridsEqual(_grid, grid);
+        return isSeparation1 || isMerge || isSeparation2;
     }
 
     public bool ThereAreEmptyCells()
@@ -322,8 +324,10 @@ public class Grid
         return false;
     }
 
-    private void SeparationStep(Direction direction) // of non-zero values, preserving their order, from the others.
+    private void SeparationStep(Direction direction, out bool isSeparation) // of non-zero values, preserving their order, from the others.
     {
+        isSeparation = false;
+
         switch(direction)
         {
             case Direction.Up:
@@ -348,7 +352,12 @@ public class Grid
 
                     for (int y = 0; y < Size; y++)
                     {
-                        _grid[y, x] = _lst[y];
+                        if (_grid[y, x] != _lst[y])
+                        {
+                            _grid[y, x] = _lst[y];
+
+                            isSeparation = true;
+                        }
                     }
                 }
 
@@ -377,7 +386,12 @@ public class Grid
 
                     for (int y = 0; y < Size; y++)
                     {
-                        _grid[y, x] = _lst[y];
+                        if (_grid[y, x] != _lst[y])
+                        {
+                            _grid[y, x] = _lst[y];
+
+                            isSeparation = true;
+                        }
                     }
                 }
 
@@ -406,7 +420,12 @@ public class Grid
 
                     for (int x = 0; x < Size; x++)
                     {
-                        _grid[y, x] = _lst[x];
+                        if (_grid[y, x] != _lst[x])
+                        {
+                            _grid[y, x] = _lst[x];
+
+                            isSeparation = true;
+                        }
                     }
                 }
 
@@ -435,7 +454,12 @@ public class Grid
 
                     for (int x = 0; x < Size; x++)
                     {
-                        _grid[y, x] = _lst[x];
+                        if (_grid[y, x] != _lst[x])
+                        {
+                            _grid[y, x] = _lst[x];
+
+                            isSeparation = true;
+                        }
                     }
                 }
 
@@ -580,30 +604,6 @@ public class Grid
         }
     }
 
-    private static int[,] GetGridClone(int[,] gridSrc)
-    {
-        return (int[,])gridSrc.Clone();
-    }
-
-    private static bool AreGridsEqual(int[,] gridSrc, int[,] gridDst)
-    {
-        Trace.Assert(gridSrc.GetLength(0) == Size && gridSrc.GetLength(1) == Size);
-        Trace.Assert(gridDst.GetLength(0) == Size && gridDst.GetLength(1) == Size);
-
-        for (int y = 0; y < Size; y++)
-        {
-            for (int x = 0; x < Size; x++)
-            {
-                if (gridSrc[y, x] != gridDst[y, x])
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
     public void Print(bool init = false)
     {
         const int width = 29;
@@ -637,7 +637,17 @@ public class Grid
         {
             for (int x = 0; x < Size; x++)
             {
+                bool isFill = false;
+
                 int value = _grid[y, x];
+
+                if (value < 0)
+                {
+                    value = -value;
+                    _grid[y, x] = value;
+
+                    isFill = true;
+                }
 
                 string strValue = value switch
                 {
@@ -673,6 +683,14 @@ public class Grid
                 Program.Write(new string(' ', 4), left + (x * 7) + 2, top + (y * 4) + 1, fColor, bColor);
                 Program.Write(strValue,           left + (x * 7) + 2, top + (y * 4) + 2, fColor, bColor);
                 Program.Write(new string(' ', 4), left + (x * 7) + 2, top + (y * 4) + 3, fColor, bColor);
+
+                if (isFill)
+                {
+                    Program.Write("┌──┐", left + (x * 7) + 2, top + (y * 4) + 1, ConsoleColor.Black, bColor);
+                    Program.Write("│",    left + (x * 7) + 2, top + (y * 4) + 2, ConsoleColor.Black, bColor);
+                    Program.Write(   "│", left + (x * 7) + 5, top + (y * 4) + 2, ConsoleColor.Black, bColor);
+                    Program.Write("└──┘", left + (x * 7) + 2, top + (y * 4) + 3, ConsoleColor.Black, bColor);
+                }
             }
         }
     }
