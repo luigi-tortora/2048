@@ -5,13 +5,12 @@ using System.Threading;
 
 public class Program
 {
+    private const int Max = 2048;
+
+    private enum GameOver { None, YouWin, YouLose }
+
     public static void Main(string[] args)
     {
-        const int width = 33;
-        const int height = 27;
-
-        const int Max = 2048;
-
         Console.Title = $"{Max}";
 
         Console.OutputEncoding = System.Text.Encoding.Unicode;
@@ -21,8 +20,8 @@ public class Program
 
         Console.SetWindowPosition(0, 0);
 
-        Console.WindowWidth = width;
-        Console.WindowHeight = height;
+        Console.WindowWidth = 33;
+        Console.WindowHeight = 27;
 
         Console.BufferWidth = Console.WindowWidth;
         Console.BufferHeight = Console.WindowHeight;
@@ -112,18 +111,6 @@ public class Program
         Console.ResetColor();
     }
 
-    public static Direction GetDirectionByConsoleKey(ConsoleKey consoleKey)
-    {
-        return consoleKey switch
-        {
-            ConsoleKey.UpArrow    => Direction.Up,
-            ConsoleKey.DownArrow  => Direction.Down,
-            ConsoleKey.LeftArrow  => Direction.Left,
-            ConsoleKey.RightArrow => Direction.Right,
-            _ => throw new ArgumentException(nameof(consoleKey))
-        };
-    }
-
     public static void Write(
         string str, int left, int top,
         ConsoleColor fColor = ConsoleColor.Gray,
@@ -138,7 +125,19 @@ public class Program
         Console.ResetColor();
     }
 
-    public static void BeepAsync(int frequencyA = 800, int frequencyB = 0, int duration = 200, bool ramp = false)
+    private static Direction GetDirectionByConsoleKey(ConsoleKey consoleKey)
+    {
+        return consoleKey switch
+        {
+            ConsoleKey.UpArrow    => Direction.Up,
+            ConsoleKey.DownArrow  => Direction.Down,
+            ConsoleKey.LeftArrow  => Direction.Left,
+            ConsoleKey.RightArrow => Direction.Right,
+            _ => throw new ArgumentException(nameof(consoleKey))
+        };
+    }
+
+    private static void BeepAsync(int frequencyA = 800, int frequencyB = 0, int duration = 200, bool ramp = false)
     {
         ThreadPool.QueueUserWorkItem((_) =>
         {
@@ -174,48 +173,46 @@ public class Program
         });
     }
 
-    public static void PrintStats(Grid grid, GameOver gameOver = GameOver.None, bool init = false) // TODO: May include the Hi-Score (to be persisted on disk).
+    private static void PrintStats(Grid grid, GameOver gameOver = GameOver.None, bool init = false) // TODO: May include the Hi-Score (to be persisted on disk).
     {
         const int width = 17;
-        const int height = 7;
+        //const int height = 7;
 
         int left = (Console.WindowWidth - width) / 2; // Center.
         int top = 1; // Up.
 
         if (init)
         {
-            Program.Write("┌───────────────┐", left, top + 0,  ConsoleColor.Black, ConsoleColor.White);
-            Program.Write("│ Score │       │", left, top + 1,  ConsoleColor.Black, ConsoleColor.White);
-            Program.Write("│ Max   │       │", left, top + 2,  ConsoleColor.Black, ConsoleColor.White);
-            Program.Write("╞═══════════════╡", left, top + 3,  ConsoleColor.Black, ConsoleColor.White);
-            Program.Write("│ Arrows │ Move │", left, top + 4,  ConsoleColor.Black, ConsoleColor.White);
-            Program.Write("│ Esc    │ Exit │", left, top + 5,  ConsoleColor.Black, ConsoleColor.White);
-            Program.Write("└───────────────┘", left, top + 6,  ConsoleColor.Black, ConsoleColor.White);
+            Write("┌───────────────┐", left, top + 0, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Score │       │", left, top + 1, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Max   │       │", left, top + 2, ConsoleColor.Black, ConsoleColor.White);
+            Write("╞═══════════════╡", left, top + 3, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Arrows │ Move │", left, top + 4, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Esc    │ Exit │", left, top + 5, ConsoleColor.Black, ConsoleColor.White);
+            Write("└───────────────┘", left, top + 6, ConsoleColor.Black, ConsoleColor.White);
         }
 
         if (gameOver == GameOver.None)
         {
-            Program.Write($"{grid.Score}".PadRight(5), left + 10, top + 1, ConsoleColor.White, ConsoleColor.Black);
-            Program.Write($"{grid.Max}".PadRight(5),   left + 10, top + 2, ConsoleColor.White, ConsoleColor.Black);
+            Write($"{grid.Score}".PadRight(5), left + 10, top + 1, ConsoleColor.White, ConsoleColor.Black);
+            Write($"{grid.Max}".PadRight(5),   left + 10, top + 2, ConsoleColor.White, ConsoleColor.Black);
         }
         else
         {
             string str1 = "Game Over".PadRight(13);
             string str2 = gameOver == GameOver.YouWin ? "You Win!".PadRight(13) : "You Lose!".PadRight(13);
 
-            Program.Write(str1, left + 2, top + 4, ConsoleColor.White, ConsoleColor.Black);
-            Program.Write(str2, left + 2, top + 5, ConsoleColor.White, ConsoleColor.Black);
+            Write(str1, left + 2, top + 4, ConsoleColor.White, ConsoleColor.Black);
+            Write(str2, left + 2, top + 5, ConsoleColor.White, ConsoleColor.Black);
         }
     }
 }
 
 public enum Direction { Up, Down, Left, Right };
 
-public enum GameOver { None, YouWin, YouLose }
-
 public class Grid
 {
-    public const int Size = 4;
+    private const int Size = 4;
 
     public int Score { get; private set; }
     public int Max { get; private set; }
@@ -272,11 +269,12 @@ public class Grid
 
     public bool TryMove(Direction direction, out bool isMerge)
     {
-        SeparationStep(direction, out bool isSeparation1);
-        MergingStep(direction, out isMerge);
-        SeparationStep(direction, out bool isSeparation2);
+        SeparationStep(direction, out bool isSeparation);
 
-        return isSeparation1 || isMerge || isSeparation2;
+        MergingStep(direction, out isMerge);
+        if (isMerge) SeparationStep(direction, out _);
+
+        return isSeparation || isMerge;
     }
 
     public bool ThereAreEmptyCells()
