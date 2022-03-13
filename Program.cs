@@ -36,12 +36,12 @@ public class Program
 
         grid.Print(init: true);
 
+        PrintStats(grid, init: true);
+
         bool exit = false;
         GameOver gameOver = GameOver.None;
 
-        PrintStats(grid, gameOver, init: true);
-
-        while (!exit && gameOver != GameOver.YouLose)
+        while (!exit)
         {
             if (Console.KeyAvailable)
             {
@@ -70,24 +70,24 @@ public class Program
                             Program.BeepAsync(frequencyA: 600, duration: 250);
                         }
 
-                        if (grid.Max == Max)
+                        if (gameOver == GameOver.None && grid.Max == Max)
                         {
                             gameOver = GameOver.YouWin;
 
                             PrintStats(grid, gameOver);
 
+                            Thread.Sleep(250);
                             BeepAsync(frequencyA: 1000, frequencyB: 1500, duration: 500, ramp: true);
                         }
 
-                        if (!grid.ThereAreEmptyCells() && !grid.ThereAreEqualAdjacentCells())
+                        if (gameOver != GameOver.YouLose && !grid.ThereAreEmptyCells() && !grid.ThereAreEqualAdjacentCells())
                         {
                             gameOver = GameOver.YouLose;
 
                             PrintStats(grid, gameOver);
 
+                            Thread.Sleep(250);
                             BeepAsync(frequencyA: 1000, frequencyB: 500, duration: 500, ramp: true);
-
-                            while (Console.ReadKey(true).Key != ConsoleKey.Escape);
                         }
 
                         break;
@@ -174,7 +174,7 @@ public class Program
         });
     }
 
-    public static void PrintStats(Grid grid, GameOver gameOver, bool init = false) // TODO: May include the Hi-Score (to be persisted on disk).
+    public static void PrintStats(Grid grid, GameOver gameOver = GameOver.None, bool init = false) // TODO: May include the Hi-Score (to be persisted on disk).
     {
         const int width = 17;
         const int height = 7;
@@ -193,10 +193,12 @@ public class Program
             Program.Write("└───────────────┘", left, top + 6,  ConsoleColor.Black, ConsoleColor.White);
         }
 
-        Program.Write($"{grid.Score}".PadRight(5), left + 10, top + 1, ConsoleColor.White, ConsoleColor.Black);
-        Program.Write($"{grid.Max}".PadRight(5),   left + 10, top + 2, ConsoleColor.White, ConsoleColor.Black);
-
-        if (gameOver != GameOver.None)
+        if (gameOver == GameOver.None)
+        {
+            Program.Write($"{grid.Score}".PadRight(5), left + 10, top + 1, ConsoleColor.White, ConsoleColor.Black);
+            Program.Write($"{grid.Max}".PadRight(5),   left + 10, top + 2, ConsoleColor.White, ConsoleColor.Black);
+        }
+        else
         {
             string str1 = "Game Over".PadRight(13);
             string str2 = gameOver == GameOver.YouWin ? "You Win!".PadRight(13) : "You Lose!".PadRight(13);
@@ -218,20 +220,21 @@ public class Grid
     public int Score { get; private set; }
     public int Max { get; private set; }
 
-    private readonly int[,] _grid;
+    private record struct Cell(int Value, bool IsFill);
+    private readonly Cell[,] _grid;
 
     private readonly Random _rnd;
     private readonly List<int> _lst;
 
     public Grid()
     {
-        _grid = new int[Size, Size];
+        _grid = new Cell[Size, Size];
 
         for (int y = 0; y < Size; y++)
         {
             for (int x = 0; x < Size; x++)
             {
-                _grid[y, x] = 0;
+                _grid[y, x].Value = 0;
             }
         }
 
@@ -251,11 +254,12 @@ public class Grid
             int y = _rnd.Next(0, Size);
             int x = _rnd.Next(0, Size);
 
-            if (_grid[y, x] == 0)
+            if (_grid[y, x].Value == 0)
             {
                 int value = _rnd.Next(0, Size) < (Size * 3) / 4 ? 2 : 4; // 3/4 -> 2, 1/4 -> 4.
 
-                _grid[y, x] = -value;
+                _grid[y, x].Value = value;
+                _grid[y, x].IsFill = true;
 
                 Max = Math.Max(Max, value);
 
@@ -281,7 +285,7 @@ public class Grid
         {
             for (int x = 0; x < Size; x++)
             {
-                if (_grid[y, x] == 0)
+                if (_grid[y, x].Value == 0)
                 {
                     return true;
                 }
@@ -297,8 +301,8 @@ public class Grid
         {
             for (int x = 0; x < Size - 1; x++)
             {
-                int left  = _grid[y, x];
-                int right = _grid[y, x + 1];
+                int left  = _grid[y, x].Value;
+                int right = _grid[y, x + 1].Value;
 
                 if (left == right && left != 0)
                 {
@@ -311,8 +315,8 @@ public class Grid
         {
             for (int y = 0; y < Size - 1; y++)
             {
-                int up   = _grid[y, x];
-                int down = _grid[y + 1, x];
+                int up   = _grid[y, x].Value;
+                int down = _grid[y + 1, x].Value;
 
                 if (up == down && up != 0)
                 {
@@ -338,7 +342,7 @@ public class Grid
 
                     for (int y = Size - 1; y >= 0; y--)
                     {
-                        int value = _grid[y, x];
+                        int value = _grid[y, x].Value;
 
                         if (value != 0)
                         {
@@ -352,9 +356,9 @@ public class Grid
 
                     for (int y = 0; y < Size; y++)
                     {
-                        if (_grid[y, x] != _lst[y])
+                        if (_grid[y, x].Value != _lst[y])
                         {
-                            _grid[y, x] = _lst[y];
+                            _grid[y, x].Value = _lst[y];
 
                             isSeparation = true;
                         }
@@ -372,7 +376,7 @@ public class Grid
 
                     for (int y = 0; y <= Size - 1; y++)
                     {
-                        int value = _grid[y, x];
+                        int value = _grid[y, x].Value;
 
                         if (value != 0)
                         {
@@ -386,9 +390,9 @@ public class Grid
 
                     for (int y = 0; y < Size; y++)
                     {
-                        if (_grid[y, x] != _lst[y])
+                        if (_grid[y, x].Value != _lst[y])
                         {
-                            _grid[y, x] = _lst[y];
+                            _grid[y, x].Value = _lst[y];
 
                             isSeparation = true;
                         }
@@ -406,7 +410,7 @@ public class Grid
 
                     for (int x = Size - 1; x >= 0; x--)
                     {
-                        int value = _grid[y, x];
+                        int value = _grid[y, x].Value;
 
                         if (value != 0)
                         {
@@ -420,9 +424,9 @@ public class Grid
 
                     for (int x = 0; x < Size; x++)
                     {
-                        if (_grid[y, x] != _lst[x])
+                        if (_grid[y, x].Value != _lst[x])
                         {
-                            _grid[y, x] = _lst[x];
+                            _grid[y, x].Value = _lst[x];
 
                             isSeparation = true;
                         }
@@ -440,7 +444,7 @@ public class Grid
 
                     for (int x = 0; x <= Size - 1; x++)
                     {
-                        int value = _grid[y, x];
+                        int value = _grid[y, x].Value;
 
                         if (value != 0)
                         {
@@ -454,9 +458,9 @@ public class Grid
 
                     for (int x = 0; x < Size; x++)
                     {
-                        if (_grid[y, x] != _lst[x])
+                        if (_grid[y, x].Value != _lst[x])
                         {
-                            _grid[y, x] = _lst[x];
+                            _grid[y, x].Value = _lst[x];
 
                             isSeparation = true;
                         }
@@ -482,15 +486,15 @@ public class Grid
 
                     for (int y = 0; y <= Size - 2; y++)
                     {
-                        int up   = _grid[y, x];
-                        int down = _grid[y + 1, x];
+                        int up   = _grid[y, x].Value;
+                        int down = _grid[y + 1, x].Value;
 
                         if (up == down)
                         {
                             if (up != 0)
                             {
-                                _grid[y, x] = up + down;
-                                _grid[y + 1, x] = 0;
+                                _grid[y, x].Value = up + down;
+                                _grid[y + 1, x].Value = 0;
 
                                 isMerge = true;
 
@@ -514,15 +518,15 @@ public class Grid
 
                     for (int y = Size - 2; y >= 0; y--)
                     {
-                        int up   = _grid[y, x];
-                        int down = _grid[y + 1, x];
+                        int up   = _grid[y, x].Value;
+                        int down = _grid[y + 1, x].Value;
 
                         if (up == down)
                         {
                             if (up != 0)
                             {
-                                _grid[y, x] = 0;
-                                _grid[y + 1, x] = up + down;
+                                _grid[y, x].Value = 0;
+                                _grid[y + 1, x].Value = up + down;
 
                                 isMerge = true;
 
@@ -546,15 +550,15 @@ public class Grid
 
                     for (int x = 0; x <= Size - 2; x++)
                     {
-                        int left  = _grid[y, x];
-                        int right = _grid[y, x + 1];
+                        int left  = _grid[y, x].Value;
+                        int right = _grid[y, x + 1].Value;
 
                         if (left == right)
                         {
                             if (left != 0)
                             {
-                                _grid[y, x] = left + right;
-                                _grid[y, x + 1] = 0;
+                                _grid[y, x].Value = left + right;
+                                _grid[y, x + 1].Value = 0;
 
                                 isMerge = true;
 
@@ -578,15 +582,15 @@ public class Grid
 
                     for (int x = Size - 2; x >= 0; x--)
                     {
-                        int left  = _grid[y, x];
-                        int right = _grid[y, x + 1];
+                        int left  = _grid[y, x].Value;
+                        int right = _grid[y, x + 1].Value;
 
                         if (left == right)
                         {
                             if (left != 0)
                             {
-                                _grid[y, x] = 0;
-                                _grid[y, x + 1] = left + right;
+                                _grid[y, x].Value = 0;
+                                _grid[y, x + 1].Value = left + right;
 
                                 isMerge = true;
 
@@ -637,17 +641,7 @@ public class Grid
         {
             for (int x = 0; x < Size; x++)
             {
-                bool isFill = false;
-
-                int value = _grid[y, x];
-
-                if (value < 0)
-                {
-                    value = -value;
-                    _grid[y, x] = value;
-
-                    isFill = true;
-                }
+                int value = _grid[y, x].Value;
 
                 string strValue = value switch
                 {
@@ -684,8 +678,10 @@ public class Grid
                 Program.Write(strValue,           left + (x * 7) + 2, top + (y * 4) + 2, fColor, bColor);
                 Program.Write(new string(' ', 4), left + (x * 7) + 2, top + (y * 4) + 3, fColor, bColor);
 
-                if (isFill)
+                if (_grid[y, x].IsFill)
                 {
+                    _grid[y, x].IsFill = false;
+
                     Program.Write("┌──┐", left + (x * 7) + 2, top + (y * 4) + 1, ConsoleColor.Black, bColor);
                     Program.Write("│",    left + (x * 7) + 2, top + (y * 4) + 2, ConsoleColor.Black, bColor);
                     Program.Write(   "│", left + (x * 7) + 5, top + (y * 4) + 2, ConsoleColor.Black, bColor);
