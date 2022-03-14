@@ -480,8 +480,6 @@ public class Grid
             {
                 for (int x = 0; x < Size; x++)
                 {
-                    _lst.Clear();
-
                     for (int y = 0; y <= Size - 2; y++)
                     {
                         int up   = _grid[y, x].Value;
@@ -512,8 +510,6 @@ public class Grid
             {
                 for (int x = 0; x < Size; x++)
                 {
-                    _lst.Clear();
-
                     for (int y = Size - 2; y >= 0; y--)
                     {
                         int up   = _grid[y, x].Value;
@@ -544,8 +540,6 @@ public class Grid
             {
                 for (int y = 0; y < Size; y++)
                 {
-                    _lst.Clear();
-
                     for (int x = 0; x <= Size - 2; x++)
                     {
                         int left  = _grid[y, x].Value;
@@ -576,8 +570,6 @@ public class Grid
             {
                 for (int y = 0; y < Size; y++)
                 {
-                    _lst.Clear();
-
                     for (int x = Size - 2; x >= 0; x--)
                     {
                         int left  = _grid[y, x].Value;
@@ -643,7 +635,7 @@ public class Grid
 
                 string strValue = value switch
                 {
-                    0                 => new string(' ', 4),
+                    0                 => new String(' ', 4),
                     >= 2   and <= 8   => $" {value}  ",
                     >= 16  and <= 64  => $" {value} ",
                     >= 128 and <= 512 => $"{value} ",
@@ -672,9 +664,9 @@ public class Grid
                     _                   => ConsoleColor.Black
                 };
 
-                Program.Write(new string(' ', 4), left + (x * 7) + 2, top + (y * 4) + 1, fColor, bColor);
+                Program.Write(new String(' ', 4), left + (x * 7) + 2, top + (y * 4) + 1, fColor, bColor);
                 Program.Write(strValue,           left + (x * 7) + 2, top + (y * 4) + 2, fColor, bColor);
-                Program.Write(new string(' ', 4), left + (x * 7) + 2, top + (y * 4) + 3, fColor, bColor);
+                Program.Write(new String(' ', 4), left + (x * 7) + 2, top + (y * 4) + 3, fColor, bColor);
 
                 if (_grid[y, x].IsFill)
                 {
