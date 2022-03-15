@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.IO;
 using System.Threading;
 
 public class Program
 {
+    private const int AbsoluteMax = 8192;
     private const int Max = 2048;
+
+    private const string StatsPath = "stats.dat";
 
     private enum GameOver { None, YouWin, YouLose }
 
@@ -21,14 +24,16 @@ public class Program
         Console.SetWindowPosition(0, 0);
 
         Console.WindowWidth = 33;
-        Console.WindowHeight = 27;
+        Console.WindowHeight = 30;
 
         Console.BufferWidth = Console.WindowWidth;
         Console.BufferHeight = Console.WindowHeight;
 
         Console.Clear();
 
-        Grid grid = new();
+        TryLoadStats(out int hiScore, out int hiMax);
+
+        Grid grid = new(hiScore, hiMax);
 
         grid.TryFill();
         grid.TryFill();
@@ -54,9 +59,9 @@ public class Program
                     case ConsoleKey.LeftArrow:
                     case ConsoleKey.RightArrow:
                     {
-                        if (grid.TryMove(GetDirectionByConsoleKey(cKI.Key), out bool isMerge))
+                        if (grid.Max < AbsoluteMax && grid.TryMove(GetDirectionByConsoleKey(cKI.Key), out bool isMerge))
                         {
-                            Trace.Assert(grid.TryFill());
+                            grid.TryFill();
 
                             grid.Print();
 
@@ -95,6 +100,8 @@ public class Program
                     case ConsoleKey.Escape:
                     {
                         exit = true;
+
+                        UpdateStats(grid);
 
                         break;
                     }
@@ -173,37 +180,130 @@ public class Program
         });
     }
 
-    private static void PrintStats(Grid grid, GameOver gameOver = GameOver.None, bool init = false) // TODO: May include the Hi-Score (to be persisted on disk).
+    private static bool TryLoadStats(out int hiScore, out int hiMax)
     {
-        const int width = 17;
-        //const int height = 7;
+        try
+        {
+            hiScore = 0;
+            hiMax   = 0;
+
+            if (!File.Exists(StatsPath))
+            {
+                return false;
+            }
+
+            string[] stats = File.ReadAllLines(StatsPath);
+
+            if (stats.Length != 2)
+            {
+                return false;
+            }
+
+            byte[] bytesHiScore = Convert.FromBase64String(stats[0]);
+            byte[] bytesHiMax   = Convert.FromBase64String(stats[1]);
+
+            if (bytesHiScore.Length != 4 || bytesHiMax.Length != 4)
+            {
+                return false;
+            }
+
+            hiScore = BitConverter.ToInt32(bytesHiScore);
+            hiMax   = BitConverter.ToInt32(bytesHiMax);
+
+            if (hiScore < 0 || hiScore > 99999 || hiMax < 0 || hiMax > 9999)
+            {
+                hiScore = 0;
+                hiMax   = 0;
+
+                return false;
+            }
+
+            return true;
+        }
+        catch
+        {
+            hiScore = 0;
+            hiMax   = 0;
+
+            return false;
+        }
+    }
+
+    private static bool TrySaveStats(int score, int max)
+    {
+        try
+        {
+            byte[] bytesScore = BitConverter.GetBytes(score);
+            byte[] bytesMax   = BitConverter.GetBytes(max);
+
+            string[] stats = new String[2];
+
+            stats[0] = Convert.ToBase64String(bytesScore);
+            stats[1] = Convert.ToBase64String(bytesMax);
+
+            File.WriteAllLines(StatsPath, stats);
+
+            return true;
+        }
+        catch
+        {
+            File.Delete(StatsPath);
+
+            return false;
+        }
+    }
+
+    private static void UpdateStats(Grid grid)
+    {
+        if (TryLoadStats(out int hiScore, out int hiMax))
+        {
+            if (grid.Score > hiScore || grid.Max > hiMax)
+            {
+                TrySaveStats(grid.Score, grid.Max);
+            }
+        }
+        else
+        {
+            TrySaveStats(grid.Score, grid.Max);
+        }
+    }
+
+    private static void PrintStats(Grid grid, GameOver gameOver = GameOver.None, bool init = false)
+    {
+        const int width = 20;
+        //const int height = 10;
 
         int left = (Console.WindowWidth - width) / 2; // Center.
         int top = 1; // Up.
 
         if (init)
         {
-            Write("┌───────────────┐", left, top + 0, ConsoleColor.Black, ConsoleColor.White);
-            Write("│ Score │       │", left, top + 1, ConsoleColor.Black, ConsoleColor.White);
-            Write("│ Max   │       │", left, top + 2, ConsoleColor.Black, ConsoleColor.White);
-            Write("╞═══════════════╡", left, top + 3, ConsoleColor.Black, ConsoleColor.White);
-            Write("│ Arrows │ Move │", left, top + 4, ConsoleColor.Black, ConsoleColor.White);
-            Write("│ Esc    │ Exit │", left, top + 5, ConsoleColor.Black, ConsoleColor.White);
-            Write("└───────────────┘", left, top + 6, ConsoleColor.Black, ConsoleColor.White);
+            Write("┌──────────────────┐", left, top + 0, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Score    │       │", left, top + 1, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Max      │       │", left, top + 2, ConsoleColor.Black, ConsoleColor.White);
+            Write("├──────────────────┤", left, top + 3, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Hi-Score │       │", left, top + 4, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Hi-Max   │       │", left, top + 5, ConsoleColor.Black, ConsoleColor.White);
+            Write("╞══════════════════╡", left, top + 6, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Arrows   │ Move  │", left, top + 7, ConsoleColor.Black, ConsoleColor.White);
+            Write("│ Esc      │ Exit  │", left, top + 8, ConsoleColor.Black, ConsoleColor.White);
+            Write("└──────────────────┘", left, top + 9, ConsoleColor.Black, ConsoleColor.White);
         }
 
         if (gameOver == GameOver.None)
         {
-            Write($"{grid.Score}".PadRight(5), left + 10, top + 1, ConsoleColor.White, ConsoleColor.Black);
-            Write($"{grid.Max}".PadRight(5),   left + 10, top + 2, ConsoleColor.White, ConsoleColor.Black);
+            Write($"{grid.Score}".PadRight(5),   left + 13, top + 1, ConsoleColor.White, ConsoleColor.Black);
+            Write($"{grid.Max}".PadRight(5),     left + 13, top + 2, ConsoleColor.White, ConsoleColor.Black);
+            Write($"{grid.HiScore}".PadRight(5), left + 13, top + 4, ConsoleColor.White, ConsoleColor.Black);
+            Write($"{grid.HiMax}".PadRight(5),   left + 13, top + 5, ConsoleColor.White, ConsoleColor.Black);
         }
         else
         {
-            string str1 = "Game Over".PadRight(13);
-            string str2 = gameOver == GameOver.YouWin ? "You Win!".PadRight(13) : "You Lose!".PadRight(13);
+            string str7 = "Game Over";
+            string str8 = gameOver == GameOver.YouWin ? "You Win!" : "You Lose!";
 
-            Write(str1, left + 2, top + 4, ConsoleColor.White, ConsoleColor.Black);
-            Write(str2, left + 2, top + 5, ConsoleColor.White, ConsoleColor.Black);
+            Write(str7.PadRight(15), left + 2, top + 7, ConsoleColor.White, ConsoleColor.Black);
+            Write(str8.PadRight(15), left + 2, top + 8, ConsoleColor.White, ConsoleColor.Black);
         }
     }
 }
@@ -217,14 +317,20 @@ public class Grid
     public int Score { get; private set; }
     public int Max { get; private set; }
 
+    public int HiScore { get; }
+    public int HiMax { get; }
+
     private record struct Cell(int Value, bool IsFill);
     private readonly Cell[,] _grid;
 
     private readonly Random _rnd;
     private readonly List<int> _lst;
 
-    public Grid()
+    public Grid(int hiScore = 0, int hiMax = 0)
     {
+        HiScore = hiScore;
+        HiMax = hiMax;
+
         _grid = new Cell[Size, Size];
 
         for (int y = 0; y < Size; y++)
@@ -257,8 +363,6 @@ public class Grid
 
                 _grid[y, x].Value = value;
                 _grid[y, x].IsFill = true;
-
-                Max = Math.Max(Max, value);
 
                 break;
             }
@@ -641,7 +745,6 @@ public class Grid
                     >= 128 and <= 512 => $"{value} ",
                     _                 => $"{value}"
                 };
-                Trace.Assert(strValue.Length <= 4);
 
                 ConsoleColor fColor = value switch
                 {
